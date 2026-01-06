@@ -38,6 +38,17 @@ vector_embedding.txt
 *.xls
 *.csv
 *.json
+# Exception: MCP server config files
+!mcp/package.json
+!mcp/package-lock.json
+!mcp/tsconfig.json
 
 models/
 *.DS_Store
+
+# MCP build artifacts
+mcp/node_modules/
+mcp/dist/
+
+# Claude Code instructions (personal, not committed)
+CLAUDE.md

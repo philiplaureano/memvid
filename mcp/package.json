@@ -1,0 +1,40 @@
+{
+  "name": "memvid-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for memvid memory operations",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "memvid-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "memvid",
+    "memory",
+    "ai",
+    "agents"
+  ],
+  "author": "Philip Laureano",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/philiplaureano/memvid"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
