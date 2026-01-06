@@ -112,4 +112,33 @@ Removes memvid from all client configs. Does not delete memory file.
 
 ---
 
+## Agent Instructions (Optional)
+
+Want your AI to use memory proactively? Add this to your CLAUDE.md, AGENTS.md, or system prompt:
+
+```markdown
+## Memory (memvid MCP)
+
+You have persistent memory. Use it proactively.
+
+**Store after**: Solving problems, learning preferences, discovering patterns, encountering gotchas.
+**Recall before**: Answering domain questions, when context seems missing.
+**At session start**: Run `memory_list(limit=5)` to prime context.
+
+**Store format**:
+- Title: Concise description
+- Content: Distilled insight (not transcript)
+- Tags: [domain, topic, type]
+- URI: mv2://category/subcategory
+
+**What to store**: Solutions, preferences, patterns, decisions, warnings.
+**What NOT to store**: Raw transcripts, failed attempts, obvious facts.
+
+**Principle**: Store what you'd want to know in 6 months.
+```
+
+For comprehensive guidance, see [MEMVID_INSTRUCTIONS.md](./MEMVID_INSTRUCTIONS.md).
+
+---
+
 **That's it.** Memory persists across sessions. Your AI clients now remember.
