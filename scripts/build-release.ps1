@@ -46,9 +46,22 @@ try {
 Write-Host "Copying binary..."
 Copy-Item "$RootDir\cli\target\release\memvid.exe" "$DistDir\bin\"
 
-# Copy MCP server
+# Build MCP server with dependencies
+Write-Host "Building MCP server..."
+Push-Location "$RootDir\mcp"
+try {
+    & npm ci --production
+    if ($LASTEXITCODE -ne 0) {
+        throw "npm ci failed"
+    }
+} finally {
+    Pop-Location
+}
+
+# Copy MCP server with node_modules
 Write-Host "Copying MCP server..."
 Copy-Item -Recurse "$RootDir\mcp\dist" "$DistDir\mcp\"
+Copy-Item -Recurse "$RootDir\mcp\node_modules" "$DistDir\mcp\"
 Copy-Item "$RootDir\mcp\package.json" "$DistDir\mcp\"
 if (Test-Path "$RootDir\mcp\README.md") { Copy-Item "$RootDir\mcp\README.md" "$DistDir\mcp\" }
 if (Test-Path "$RootDir\mcp\QUICKSTART.md") { Copy-Item "$RootDir\mcp\QUICKSTART.md" "$DistDir\mcp\" }
@@ -61,25 +74,38 @@ $InstallScript = @'
 .SYNOPSIS
     memvid Bundled Installer
 .DESCRIPTION
-    Installs pre-built binary + configures MCP servers
+    Installs pre-built binary + MCP server + configures MCP clients
 #>
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$BinDir = Join-Path $env:LOCALAPPDATA "memvid\bin"
+$InstallDir = Join-Path $env:LOCALAPPDATA "memvid"
+$BinDir = Join-Path $InstallDir "bin"
+$McpDir = Join-Path $InstallDir "mcp"
 $MemoryPath = Join-Path $HOME ".memvid\memory.mv2"
 
 Write-Host "memvid Installer"
 Write-Host ""
 
-# Create bin directory
+# Create install directories
 if (-not (Test-Path $BinDir)) {
     New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
+}
+if (-not (Test-Path $McpDir)) {
+    New-Item -ItemType Directory -Path $McpDir -Force | Out-Null
 }
 
 # Copy binary
 Write-Host "Installing memvid binary to $BinDir..."
-Copy-Item "$ScriptDir\bin\memvid.exe" "$BinDir\"
+Copy-Item "$ScriptDir\bin\memvid.exe" "$BinDir\" -Force
+
+# Copy MCP server
+Write-Host "Installing MCP server to $McpDir..."
+if (Test-Path "$McpDir\dist") { Remove-Item -Recurse -Force "$McpDir\dist" }
+if (Test-Path "$McpDir\node_modules") { Remove-Item -Recurse -Force "$McpDir\node_modules" }
+Copy-Item -Recurse "$ScriptDir\mcp\dist" "$McpDir\"
+Copy-Item -Recurse "$ScriptDir\mcp\node_modules" "$McpDir\"
+Copy-Item "$ScriptDir\mcp\package.json" "$McpDir\" -Force
 
 # Check if bin dir is in PATH
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -101,6 +127,9 @@ if (-not (Test-Path $MemoryPath)) {
     New-Item -ItemType File -Path $MemoryPath -Force | Out-Null
     Write-Host "Created memory file: $MemoryPath"
 }
+
+# MCP server entry point
+$McpEntryPoint = Join-Path $McpDir "dist\index.js"
 
 # Config paths
 $ClaudeDesktopConfig = Join-Path $env:APPDATA "Claude\claude_desktop_config.json"
@@ -138,8 +167,8 @@ $ClaudeDesktopDir = Split-Path $ClaudeDesktopConfig -Parent
 if ((Test-Path $ClaudeDesktopDir) -or (Test-Path $ClaudeDesktopConfig)) {
     Write-Host "Configuring Claude Desktop..."
     $memvidEntry = @{
-        command = "cmd"
-        args = @("/c", "npx", "-y", "@philiplaureano/memvid-mcp")
+        command = "node"
+        args = @($McpEntryPoint)
         env = @{
             MEMVID_DEFAULT_PATH = $MemoryPath
             MEMVID_CLI_PATH = "$BinDir\memvid.exe"
@@ -156,8 +185,8 @@ if ($null -ne $claudeCmd) {
     try { & claude mcp remove memvid 2>$null } catch { }
 
     $mcpJson = @{
-        command = "cmd"
-        args = @("/c", "npx", "-y", "@philiplaureano/memvid-mcp")
+        command = "node"
+        args = @($McpEntryPoint)
         env = @{
             MEMVID_DEFAULT_PATH = $MemoryPath
             MEMVID_CLI_PATH = "$BinDir\memvid.exe"
@@ -178,8 +207,8 @@ if ((Test-Path $CopilotDir) -or ($null -ne $copilotCmd)) {
     }
     $memvidEntry = @{
         type = "local"
-        command = "cmd"
-        args = @("/c", "npx", "-y", "@philiplaureano/memvid-mcp")
+        command = "node"
+        args = @($McpEntryPoint)
         env = @{
             MEMVID_DEFAULT_PATH = $MemoryPath
             MEMVID_CLI_PATH = "$BinDir\memvid.exe"
@@ -192,6 +221,10 @@ if ((Test-Path $CopilotDir) -or ($null -ne $copilotCmd)) {
 
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Cyan
+Write-Host "INSTALLED TO:" -ForegroundColor Yellow
+Write-Host "  Binary: $BinDir\memvid.exe"
+Write-Host "  MCP Server: $McpDir"
+Write-Host ""
 Write-Host "RESTART REQUIRED:" -ForegroundColor Yellow
 Write-Host "  Fully quit and reopen Claude Desktop"
 Write-Host "  Restart your terminal for PATH changes"

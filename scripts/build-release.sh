@@ -46,9 +46,15 @@ echo "Copying binary..."
 cp "${ROOT_DIR}/cli/target/release/memvid" "${DIST_DIR}/bin/"
 chmod +x "${DIST_DIR}/bin/memvid"
 
-# Copy MCP server
+# Build MCP server with dependencies
+echo "Building MCP server..."
+cd "${ROOT_DIR}/mcp"
+npm ci --production
+
+# Copy MCP server with node_modules
 echo "Copying MCP server..."
 cp -r "${ROOT_DIR}/mcp/dist" "${DIST_DIR}/mcp/"
+cp -r "${ROOT_DIR}/mcp/node_modules" "${DIST_DIR}/mcp/"
 cp "${ROOT_DIR}/mcp/package.json" "${DIST_DIR}/mcp/"
 cp "${ROOT_DIR}/mcp/README.md" "${DIST_DIR}/mcp/" 2>/dev/null || true
 cp "${ROOT_DIR}/mcp/QUICKSTART.md" "${DIST_DIR}/mcp/" 2>/dev/null || true
@@ -60,22 +66,32 @@ cat > "${DIST_DIR}/install.sh" << 'INSTALL_EOF'
 set -e
 
 # memvid Bundled Installer
-# Installs pre-built binary + configures MCP servers
+# Installs pre-built binary + MCP server + configures MCP clients
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$HOME/.local/share/memvid"
 BIN_DIR="$HOME/.local/bin"
+MCP_DIR="$INSTALL_DIR/mcp"
 MEMORY_PATH="$HOME/.memvid/memory.mv2"
 
 echo "memvid Installer"
 echo ""
 
-# Create bin directory
+# Create directories
 mkdir -p "$BIN_DIR"
+mkdir -p "$MCP_DIR"
 
 # Copy binary
 echo "Installing memvid binary to $BIN_DIR..."
 cp "$SCRIPT_DIR/bin/memvid" "$BIN_DIR/"
 chmod +x "$BIN_DIR/memvid"
+
+# Copy MCP server
+echo "Installing MCP server to $MCP_DIR..."
+rm -rf "$MCP_DIR/dist" "$MCP_DIR/node_modules"
+cp -r "$SCRIPT_DIR/mcp/dist" "$MCP_DIR/"
+cp -r "$SCRIPT_DIR/mcp/node_modules" "$MCP_DIR/"
+cp "$SCRIPT_DIR/mcp/package.json" "$MCP_DIR/"
 
 # Check if bin dir is in PATH
 if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
@@ -93,6 +109,9 @@ if [[ ! -f "$MEMORY_PATH" ]]; then
     touch "$MEMORY_PATH"
     echo "Created memory file: $MEMORY_PATH"
 fi
+
+# MCP server entry point
+MCP_ENTRY_POINT="$MCP_DIR/dist/index.js"
 
 # Detect OS for config paths
 detect_os() {
@@ -151,8 +170,8 @@ if [[ -d "$(dirname "$CLAUDE_DESKTOP_CONFIG")" ]] || [[ -f "$CLAUDE_DESKTOP_CONF
     echo "Configuring Claude Desktop..."
     memvid_entry=$(cat << EOF
 {
-    "command": "npx",
-    "args": ["-y", "@philiplaureano/memvid-mcp"],
+    "command": "node",
+    "args": ["$MCP_ENTRY_POINT"],
     "env": {
         "MEMVID_DEFAULT_PATH": "$MEMORY_PATH",
         "MEMVID_CLI_PATH": "$BIN_DIR/memvid"
@@ -168,7 +187,7 @@ fi
 if command -v claude &> /dev/null; then
     echo "Configuring Claude Code..."
     claude mcp remove memvid 2>/dev/null || true
-    claude mcp add-json memvid "{\"command\":\"npx\",\"args\":[\"-y\",\"@philiplaureano/memvid-mcp\"],\"env\":{\"MEMVID_DEFAULT_PATH\":\"$MEMORY_PATH\",\"MEMVID_CLI_PATH\":\"$BIN_DIR/memvid\"}}" --scope user
+    claude mcp add-json memvid "{\"command\":\"node\",\"args\":[\"$MCP_ENTRY_POINT\"],\"env\":{\"MEMVID_DEFAULT_PATH\":\"$MEMORY_PATH\",\"MEMVID_CLI_PATH\":\"$BIN_DIR/memvid\"}}" --scope user
     echo "  Configured via claude mcp add-json"
 fi
 
@@ -179,8 +198,8 @@ if [[ -d "$HOME/.copilot" ]] || command -v copilot &> /dev/null; then
     memvid_entry=$(cat << EOF
 {
     "type": "local",
-    "command": "npx",
-    "args": ["-y", "@philiplaureano/memvid-mcp"],
+    "command": "node",
+    "args": ["$MCP_ENTRY_POINT"],
     "env": {
         "MEMVID_DEFAULT_PATH": "$MEMORY_PATH",
         "MEMVID_CLI_PATH": "$BIN_DIR/memvid"
@@ -195,6 +214,10 @@ fi
 
 echo ""
 echo "========================================================"
+echo "INSTALLED TO:"
+echo "  Binary: $BIN_DIR/memvid"
+echo "  MCP Server: $MCP_DIR"
+echo ""
 echo "RESTART REQUIRED:"
 echo "  Fully quit and reopen Claude Desktop"
 echo ""
