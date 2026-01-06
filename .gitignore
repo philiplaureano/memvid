@@ -53,5 +53,8 @@ cli/target/
 mcp/node_modules/
 mcp/dist/
 
+# Release build artifacts
+dist/
+
 # Claude Code instructions (personal, not committed)
 CLAUDE.md
