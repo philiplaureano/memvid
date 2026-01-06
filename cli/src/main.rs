@@ -369,3 +369,228 @@ fn cmd_stats(path: &PathBuf) -> Result<String, Box<dyn std::error::Error>> {
     };
     Ok(serde_json::to_string(&output)?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_create_new_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.mv2");
+
+        let result = cmd_create(&path);
+        assert!(result.is_ok());
+
+        let json = result.unwrap();
+        let output: CreateOutput = serde_json::from_str(&json).unwrap();
+        assert!(output.success);
+        assert!(path.exists());
+    }
+
+    #[test]
+    fn test_create_fails_if_exists() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("existing.mv2");
+
+        cmd_create(&path).unwrap();
+
+        let result = cmd_create(&path);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn test_put_creates_file_if_not_exists() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("new.mv2");
+
+        let result = cmd_put(
+            &path,
+            Some("Test content".to_string()),
+            Some("mv2://test/uri".to_string()),
+            Some("Test Title".to_string()),
+            vec!["tag1".to_string(), "tag2".to_string()],
+        );
+
+        assert!(result.is_ok());
+        assert!(path.exists());
+
+        let json = result.unwrap();
+        let output: PutOutput = serde_json::from_str(&json).unwrap();
+        assert!(output.success);
+        assert!(output.frame_id > 0);
+    }
+
+    #[test]
+    fn test_put_appends_to_existing_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("append.mv2");
+
+        cmd_put(&path, Some("First content".to_string()), None, None, vec![]).unwrap();
+
+        let result = cmd_put(&path, Some("Second content".to_string()), None, None, vec![]);
+        assert!(result.is_ok());
+
+        let json = result.unwrap();
+        let output: PutOutput = serde_json::from_str(&json).unwrap();
+        assert!(output.frame_id > 1);
+    }
+
+    #[test]
+    fn test_put_rejects_empty_content() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("empty.mv2");
+
+        let result = cmd_put(&path, Some("   ".to_string()), None, None, vec![]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("empty"));
+    }
+
+    #[test]
+    fn test_search_finds_content() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("search.mv2");
+
+        cmd_put(
+            &path,
+            Some("Rust is a systems programming language".to_string()),
+            Some("mv2://topics/rust".to_string()),
+            Some("Rust Language".to_string()),
+            vec!["programming".to_string()],
+        )
+        .unwrap();
+
+        let result = cmd_search(&path, "systems programming", None, 10, 200);
+        assert!(result.is_ok());
+
+        let json = result.unwrap();
+        let output: SearchOutput = serde_json::from_str(&json).unwrap();
+        assert_eq!(output.query, "systems programming");
+        assert!(output.total_hits > 0);
+        assert!(!output.hits.is_empty());
+        assert_eq!(output.hits[0].uri, "mv2://topics/rust");
+    }
+
+    #[test]
+    fn test_search_with_scope_filter() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("scope.mv2");
+
+        cmd_put(&path, Some("Rust programming".to_string()), Some("mv2://topics/rust".to_string()), None, vec![]).unwrap();
+        cmd_put(&path, Some("Python programming".to_string()), Some("mv2://topics/python".to_string()), None, vec![]).unwrap();
+        cmd_put(&path, Some("My project uses Rust".to_string()), Some("mv2://projects/myapp".to_string()), None, vec![]).unwrap();
+
+        let result = cmd_search(&path, "programming", Some("mv2://topics/".to_string()), 10, 200);
+        assert!(result.is_ok());
+
+        let json = result.unwrap();
+        let output: SearchOutput = serde_json::from_str(&json).unwrap();
+
+        for hit in &output.hits {
+            assert!(hit.uri.starts_with("mv2://topics/"));
+        }
+    }
+
+    #[test]
+    fn test_search_returns_empty_for_no_match() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("nomatch.mv2");
+
+        cmd_put(&path, Some("Hello world".to_string()), None, None, vec![]).unwrap();
+
+        let result = cmd_search(&path, "nonexistent query xyz123", None, 10, 200);
+        assert!(result.is_ok());
+
+        let json = result.unwrap();
+        let output: SearchOutput = serde_json::from_str(&json).unwrap();
+        assert_eq!(output.total_hits, 0);
+        assert!(output.hits.is_empty());
+    }
+
+    #[test]
+    fn test_timeline_returns_entries() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("timeline.mv2");
+
+        cmd_put(&path, Some("First entry".to_string()), None, None, vec![]).unwrap();
+        cmd_put(&path, Some("Second entry".to_string()), None, None, vec![]).unwrap();
+        cmd_put(&path, Some("Third entry".to_string()), None, None, vec![]).unwrap();
+
+        let result = cmd_timeline(&path, 10, None, None, true);
+        assert!(result.is_ok());
+
+        let json = result.unwrap();
+        let output: TimelineOutput = serde_json::from_str(&json).unwrap();
+        assert_eq!(output.total, 3);
+        assert_eq!(output.entries.len(), 3);
+    }
+
+    #[test]
+    fn test_timeline_respects_limit() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("limit.mv2");
+
+        for i in 1..=5 {
+            cmd_put(&path, Some(format!("Entry {}", i)), None, None, vec![]).unwrap();
+        }
+
+        let result = cmd_timeline(&path, 2, None, None, true);
+        assert!(result.is_ok());
+
+        let json = result.unwrap();
+        let output: TimelineOutput = serde_json::from_str(&json).unwrap();
+        assert_eq!(output.total, 2);
+    }
+
+    #[test]
+    fn test_stats_returns_correct_counts() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("stats.mv2");
+
+        cmd_create(&path).unwrap();
+        cmd_put(&path, Some("Entry 1".to_string()), None, None, vec![]).unwrap();
+        cmd_put(&path, Some("Entry 2".to_string()), None, None, vec![]).unwrap();
+
+        let result = cmd_stats(&path);
+        assert!(result.is_ok());
+
+        let json = result.unwrap();
+        let output: StatsOutput = serde_json::from_str(&json).unwrap();
+        assert!(output.frame_count >= 2);
+        assert!(output.has_lex_index);
+        assert!(!output.has_vec_index);
+        assert!(output.size_bytes > 0);
+    }
+
+    #[test]
+    fn test_stats_fails_for_nonexistent_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("nonexistent.mv2");
+
+        let result = cmd_stats(&path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_json_output_is_valid() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("json.mv2");
+
+        let create_json = cmd_create(&path).unwrap();
+        assert!(serde_json::from_str::<serde_json::Value>(&create_json).is_ok());
+
+        let put_json = cmd_put(&path, Some("Test".to_string()), None, None, vec![]).unwrap();
+        assert!(serde_json::from_str::<serde_json::Value>(&put_json).is_ok());
+
+        let search_json = cmd_search(&path, "Test", None, 10, 200).unwrap();
+        assert!(serde_json::from_str::<serde_json::Value>(&search_json).is_ok());
+
+        let timeline_json = cmd_timeline(&path, 10, None, None, true).unwrap();
+        assert!(serde_json::from_str::<serde_json::Value>(&timeline_json).is_ok());
+
+        let stats_json = cmd_stats(&path).unwrap();
+        assert!(serde_json::from_str::<serde_json::Value>(&stats_json).is_ok());
+    }
+}

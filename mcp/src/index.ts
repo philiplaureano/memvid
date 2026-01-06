@@ -21,7 +21,7 @@ const DEFAULT_MEMORY_PATH = process.env.MEMVID_DEFAULT_PATH || "";
 // Path to memvid CLI binary (relative to this package or from PATH)
 const CLI_PATH = process.env.MEMVID_CLI_PATH || "memvid";
 
-interface CliResult {
+export interface CliResult {
   success: boolean;
   stdout: string;
   stderr: string;
@@ -30,7 +30,7 @@ interface CliResult {
 /**
  * Execute the memvid CLI with given arguments
  */
-async function runCli(args: string[]): Promise<CliResult> {
+export async function runCli(args: string[]): Promise<CliResult> {
   return new Promise((resolve) => {
     const proc = spawn(CLI_PATH, args, {
       stdio: ["pipe", "pipe", "pipe"],
@@ -68,7 +68,7 @@ async function runCli(args: string[]): Promise<CliResult> {
 /**
  * Resolve memory file path - use default if not provided
  */
-function resolvePath(inputPath?: string): string {
+export function resolvePath(inputPath?: string): string {
   if (inputPath) return inputPath;
   if (DEFAULT_MEMORY_PATH) return DEFAULT_MEMORY_PATH;
   throw new Error(
@@ -77,7 +77,7 @@ function resolvePath(inputPath?: string): string {
 }
 
 // Tool definitions with cognitive framing
-const TOOLS = [
+export const TOOLS = [
   {
     name: "memory_remember",
     description:
