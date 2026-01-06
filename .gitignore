@@ -46,6 +46,9 @@ vector_embedding.txt
 models/
 *.DS_Store
 
+# CLI build artifacts
+cli/target/
+
 # MCP build artifacts
 mcp/node_modules/
 mcp/dist/
