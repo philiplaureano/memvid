@@ -33,6 +33,40 @@
 <h2 align="center">⭐️ Leave a STAR to support the project ⭐️</h2>
 </p>
 
+---
+
+## This Fork
+
+**This is a fork of [memvid/memvid](https://github.com/memvid/memvid).**
+
+### Why Fork?
+
+I wanted persistent memory for AI agents that works **today**. Not next month. Not after configuring a vector database. Today.
+
+The original memvid provides excellent single-file memory storage. This fork adds:
+
+- **MCP Server** (`@philiplaureano/memvid-mcp`) — Plug memory into Claude Desktop, Claude Code, or GitHub Copilot CLI in 2 minutes
+- **Cross-platform installers** — One command setup for macOS, Linux, and Windows
+- **Agent instruction guides** — Drop-in prompts so your AI uses memory proactively
+
+### The Trade-off
+
+More sophisticated memory systems exist. They have embeddings, RAG pipelines, vector databases, and semantic search.
+
+This fork prioritises **immediate utility**:
+
+| This Fork | Enterprise Solutions |
+|-----------|---------------------|
+| Works in 2 minutes | Works after infrastructure setup |
+| Single file, no dependencies | Requires vector DB, embeddings API |
+| BM25 full-text search | Semantic vector search |
+| Good enough for most use cases | Optimised for edge cases |
+
+**If you need semantic search at scale, use the original memvid with the `vec` feature, or a dedicated vector database.**
+
+**If you want memory that works right now, keep reading.**
+
+---
 
 ## What is Memvid?
 
@@ -99,12 +133,53 @@ Memvid is a portable, serverless memory layer that gives AI agents persistent me
 
 ---
 
+## MCP Server (This Fork)
+
+Give Claude Desktop, Claude Code, or GitHub Copilot CLI persistent memory.
+
+### Install (2 minutes)
+
+**macOS/Linux**:
+```bash
+curl -fsSL https://raw.githubusercontent.com/philiplaureano/memvid/main/mcp/install.sh | bash
+```
+
+**Windows** (PowerShell as Administrator):
+```powershell
+irm https://raw.githubusercontent.com/philiplaureano/memvid/main/mcp/install.ps1 | iex
+```
+
+**Then restart Claude Desktop** (fully quit, not just close).
+
+### Verify
+
+- **Claude Desktop**: Look for hammer icon in input box
+- **Claude Code**: `claude mcp list` shows `memvid`
+- **Copilot CLI**: `/mcp show` shows `memvid`
+
+### Use
+
+```
+Remember this: The deployment password is in 1Password under "prod-deploy".
+```
+
+```
+What did I store about deployment?
+```
+
+Your AI now has memory that persists across sessions.
+
+For agent instructions (proactive memory usage), see [mcp/MEMVID_INSTRUCTIONS.md](mcp/MEMVID_INSTRUCTIONS.md).
+
+---
+
 ## SDKs & CLI
 
 Use Memvid in your preferred language:
 
 | Package | Install | Links |
 |---------|---------|-------|
+| **MCP Server** | See above | [Quickstart](mcp/QUICKSTART.md) |
 | **CLI** | `npm install -g memvid-cli` | [![npm](https://img.shields.io/npm/v/memvid-cli?style=flat-square)](https://www.npmjs.com/package/memvid-cli) |
 | **Node.js SDK** | `npm install @memvid/sdk` | [![npm](https://img.shields.io/npm/v/@memvid/sdk?style=flat-square)](https://www.npmjs.com/package/@memvid/sdk) |
 | **Python SDK** | `pip install memvid-sdk` | [![PyPI](https://img.shields.io/pypi/v/memvid-sdk?style=flat-square)](https://pypi.org/project/memvid-sdk/) |
